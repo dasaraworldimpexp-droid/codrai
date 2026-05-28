@@ -1,0 +1,44 @@
+services:
+  codrai-edge:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    ports:
+      - "${CODRAI_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./deploy/nginx/codrai-production.conf:/etc/nginx/conf.d/default.conf:ro
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    profiles:
+      - observability
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    profiles:
+      - observability
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-codrai-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+
+volumes:
+  prometheus-data:
+  grafana-data:

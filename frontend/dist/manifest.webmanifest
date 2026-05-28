@@ -1,0 +1,17 @@
+{
+  "name": "CODRAI AI Operating System",
+  "short_name": "CODRAI",
+  "description": "Premium autonomous AI operating system for multimodal workflows, local AI, orchestration, and enterprise SaaS.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "icons": [
+    {
+      "src": "/brand/codrai-official-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

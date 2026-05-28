@@ -1,0 +1,31 @@
+{
+  "family": "codrai-enterprise-cloud",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::<account-id>:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "<account-id>.dkr.ecr.<region>.amazonaws.com/codrai-backend:latest",
+      "essential": true,
+      "portMappings": [{ "containerPort": 5000, "protocol": "tcp" }],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "5000" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:codrai/database-url" },
+        { "name": "REDIS_URL", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:codrai/redis-url" },
+        { "name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:codrai/jwt-secret" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:5000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3
+      }
+    }
+  ]
+}

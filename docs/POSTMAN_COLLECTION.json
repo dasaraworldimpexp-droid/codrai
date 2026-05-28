@@ -1,0 +1,43 @@
+{
+  "info": {
+    "name": "CODRAI Developer API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api/v1" },
+    { "key": "codraiApiKey", "value": "sk_codrai_replace_me" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{codraiApiKey}}" }],
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Models",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{codraiApiKey}}" }],
+        "url": "{{baseUrl}}/models"
+      }
+    },
+    {
+      "name": "Chat Completion",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{codraiApiKey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"model\":\"codrai-balanced\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello CODRAI\"}]}"
+        },
+        "url": "{{baseUrl}}/chat/completions"
+      }
+    }
+  ]
+}

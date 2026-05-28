@@ -1,0 +1,44 @@
+{
+  "name": "codrai-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "migrate": "node src/db/run-migrations.js",
+    "start": "node src/server.js",
+    "start:workers": "node src/workers/index.js"
+  },
+  "dependencies": {
+    "archiver": "^8.0.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.76.9",
+    "cheerio": "^1.2.0",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.12.0",
+    "mongoose": "^8.9.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.1.1",
+    "openai": "^4.77.0",
+    "pdf-parse": "^2.4.5",
+    "pg": "^8.20.0",
+    "playwright": "^1.60.0",
+    "razorpay": "^2.9.5",
+    "socket.io": "^4.8.3",
+    "stripe": "^22.1.1",
+    "uuid": "^14.0.0",
+    "ws": "^8.20.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

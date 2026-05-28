@@ -1,0 +1,20 @@
+# Optional GPU override for CODRAI local AI acceleration.
+# Use only after NVIDIA drivers and NVIDIA Container Toolkit are installed and verified.
+# CPU-first services remain available through docker-compose.yml + docker-compose.local-ai.yml.
+
+services:
+  ollama:
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+    gpus: all
+
+  backend:
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      OLLAMA_GPU_BASE_URL: ${OLLAMA_GPU_BASE_URL:-http://ollama:11434}
+    gpus: all

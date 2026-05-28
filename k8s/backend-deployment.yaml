@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: codrai-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: codrai-backend
+  template:
+    metadata:
+      labels:
+        app: codrai-backend
+    spec:
+      containers:
+        - name: backend
+          image: codrai/backend:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: codrai-backend-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: codrai-backend
+spec:
+  selector:
+    app: codrai-backend
+  ports:
+    - port: 5000
+      targetPort: 5000

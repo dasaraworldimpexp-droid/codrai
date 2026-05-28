@@ -1,0 +1,3 @@
+CODRAI API running on http://localhost:5000
+CODRAI realtime WebSocket running on ws://localhost:5000/ws
+[0mGET /api/deployment/infrastructure/status [32m200[0m 18.976 ms - 1453[0m

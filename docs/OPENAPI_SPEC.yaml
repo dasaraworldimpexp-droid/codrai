@@ -1,0 +1,103 @@
+openapi: 3.1.0
+info:
+  title: CODRAI Developer API
+  version: 1.0.0
+  description: OpenAI-compatible public API gateway for CODRAI orchestration.
+servers:
+  - url: http://localhost:5000/api/v1
+security:
+  - CodraiSecretKey: []
+components:
+  securitySchemes:
+    CodraiSecretKey:
+      type: http
+      scheme: bearer
+      bearerFormat: sk_codrai
+  schemas:
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          type: string
+    ChatCompletionRequest:
+      type: object
+      required: [messages]
+      properties:
+        model:
+          type: string
+          default: codrai-balanced
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        stream:
+          type: boolean
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message: { type: string }
+            type: { type: string }
+            code: { type: string }
+        correlation_id: { type: string }
+paths:
+  /health:
+    get:
+      summary: Public API health
+      responses:
+        "200":
+          description: Health state
+  /models:
+    get:
+      summary: List CODRAI-routable models
+      responses:
+        "200":
+          description: Model list
+  /providers:
+    get:
+      summary: List provider routing status
+      responses:
+        "200":
+          description: Provider list
+  /usage:
+    get:
+      summary: Workspace usage summary
+      responses:
+        "200":
+          description: Usage analytics
+  /chat/completions:
+    post:
+      summary: Create a chat completion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: OpenAI-compatible chat completion
+        "401":
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /chat/stream:
+    post:
+      summary: Stream a chat completion over SSE
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Server-sent event stream

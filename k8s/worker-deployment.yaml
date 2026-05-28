@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: codrai-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: codrai-worker
+  template:
+    metadata:
+      labels:
+        app: codrai-worker
+    spec:
+      containers:
+        - name: worker
+          image: codrai/backend:latest
+          command: ["node", "src/workers/index.js"]
+          envFrom:
+            - secretRef:
+                name: codrai-backend-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
