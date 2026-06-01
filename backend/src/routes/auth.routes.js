@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { forgotPassword, login, logout, me, refresh, resetPassword, signup, verifyEmail } from "../controllers/auth.controller.js";
-import { requireAuth } from "../middleware/auth.middleware.js";
+import { forgotPassword, googleConfig, googleLogin, googleSettings, login, logout, me, refresh, resetPassword, saveGoogleSettings, signup, testGoogleSettings, verifyEmail } from "../controllers/auth.controller.js";
+import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
 const authMutationLimiter = rateLimit({
@@ -21,6 +21,11 @@ const authRecoveryLimiter = rateLimit({
 
 router.post("/signup", authMutationLimiter, signup);
 router.post("/login", authMutationLimiter, login);
+router.get("/google/config", googleConfig);
+router.post("/google", authMutationLimiter, googleLogin);
+router.get("/google/settings", requireRole(["admin"]), googleSettings);
+router.put("/google/settings", requireRole(["admin"]), saveGoogleSettings);
+router.post("/google/test", requireRole(["admin"]), testGoogleSettings);
 router.post("/refresh", authMutationLimiter, refresh);
 router.post("/logout", requireAuth, logout);
 router.post("/forgot-password", authRecoveryLimiter, forgotPassword);

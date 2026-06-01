@@ -1,4 +1,5 @@
 import { AuthService } from "../services/auth.service.js";
+import { GoogleOAuthConfigService } from "../services/google-oauth-config.service.js";
 
 function cookieOptions(req, maxAgeMs) {
   const host = String(req.headers.host || "");
@@ -44,6 +45,65 @@ export async function login(req, res, next) {
     });
     setSessionCookies(req, res, result);
     return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function googleConfig(req, res, next) {
+  try {
+    const service = new GoogleOAuthConfigService({ pool: req.app.locals.pool });
+    return res.status(200).json(await service.publicConfig());
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function googleLogin(req, res, next) {
+  try {
+    const authService = new AuthService({ pool: req.app.locals.pool });
+    const result = await authService.googleLogin({
+      code: req.body.code,
+      credential: req.body.credential,
+      redirectUri: req.body.redirectUri,
+      rememberMe: req.body.rememberMe !== false,
+      userAgent: req.headers["user-agent"],
+      ipAddress: req.ip,
+    });
+    setSessionCookies(req, res, result);
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function googleSettings(req, res, next) {
+  try {
+    const service = new GoogleOAuthConfigService({ pool: req.app.locals.pool });
+    return res.status(200).json(await service.adminStatus());
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function saveGoogleSettings(req, res, next) {
+  try {
+    const service = new GoogleOAuthConfigService({ pool: req.app.locals.pool });
+    const result = await service.save({
+      ...req.body,
+      userId: req.user?.id,
+      workspaceId: req.workspace?.id || req.body.workspaceId,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function testGoogleSettings(req, res, next) {
+  try {
+    const service = new GoogleOAuthConfigService({ pool: req.app.locals.pool });
+    return res.status(200).json(await service.test());
   } catch (error) {
     return next(error);
   }
