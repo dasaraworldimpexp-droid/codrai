@@ -1,1 +1,2 @@
+# Universal SPA fallback for static hosts that support _redirects.
 /* /index.html 200

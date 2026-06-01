@@ -1,8 +1,16 @@
 <IfModule mod_rewrite.c>
+  Options -MultiViews
+  DirectoryIndex index.html
   RewriteEngine On
   RewriteBase /
+
+  # Serve existing files and directories directly.
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Universal React Router fallback for Hostinger/Apache refresh and direct URL access.
   RewriteRule . /index.html [L]
 </IfModule>
+
+ErrorDocument 404 /index.html

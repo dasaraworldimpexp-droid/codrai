@@ -1,7 +1,8 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createSpaFallbackMiddleware } from "./spa-fallback.middleware.mjs";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const distDir = resolve(rootDir, "dist");
@@ -9,28 +10,7 @@ const indexFile = join(distDir, "index.html");
 const port = Number(process.env.PORT || process.env.FRONTEND_PORT || 4173);
 const backendUrl = String(process.env.CODRAI_BACKEND_URL || process.env.BACKEND_URL || "").replace(/\/+$/, "");
 
-const mimeTypes = {
-  ".css": "text/css; charset=utf-8",
-  ".gif": "image/gif",
-  ".html": "text/html; charset=utf-8",
-  ".ico": "image/x-icon",
-  ".jpeg": "image/jpeg",
-  ".jpg": "image/jpeg",
-  ".js": "application/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".txt": "text/plain; charset=utf-8",
-  ".webmanifest": "application/manifest+json; charset=utf-8",
-  ".webp": "image/webp",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-};
-
-function isInsideDist(filePath) {
-  const relative = normalize(filePath).replace(distDir, "");
-  return filePath === distDir || (filePath.startsWith(distDir + sep) && !relative.includes(`..${sep}`));
-}
+const spaFallback = createSpaFallbackMiddleware({ distDir, indexFile });
 
 function sendJson(res, statusCode, payload) {
   const body = JSON.stringify(payload);
@@ -40,35 +20,6 @@ function sendJson(res, statusCode, payload) {
     "Cache-Control": "no-store",
   });
   res.end(body);
-}
-
-function sendFile(req, res, filePath, cacheControl = "no-store") {
-  const extension = extname(filePath).toLowerCase();
-  const headers = {
-    "Content-Type": mimeTypes[extension] || "application/octet-stream",
-    "Cache-Control": cacheControl,
-  };
-
-  if (req.method === "HEAD") {
-    res.writeHead(200, headers);
-    res.end();
-    return;
-  }
-
-  res.writeHead(200, headers);
-  createReadStream(filePath).pipe(res);
-}
-
-function resolveStaticPath(pathname) {
-  const decodedPath = decodeURIComponent(pathname);
-  const safePath = decodedPath.split("/").filter(Boolean).join("/");
-  const candidate = resolve(distDir, safePath);
-
-  if (!isInsideDist(candidate)) return null;
-  if (!existsSync(candidate)) return null;
-  if (!statSync(candidate).isFile()) return null;
-
-  return candidate;
 }
 
 function backendTargetUrl(pathname, search) {
@@ -156,19 +107,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const staticFile = resolveStaticPath(pathname);
-  if (staticFile) {
-    const immutable = pathname.startsWith("/assets/");
-    sendFile(req, res, staticFile, immutable ? "public, max-age=31536000, immutable" : "no-store");
-    return;
-  }
-
-  if (!existsSync(indexFile)) {
-    sendJson(res, 500, { message: "CODRAI frontend build not found. Run npm run build before starting production." });
-    return;
-  }
-
-  sendFile(req, res, indexFile, "no-store");
+  spaFallback(req, res);
 });
 
 server.listen(port, () => {
