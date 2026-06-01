@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import CodraiBrandMark from "./components/CodraiBrandMark.jsx";
 import ProtectedRoute from "./features/auth/components/ProtectedRoute.jsx";
 import { ThemeProvider } from "./features/theme/ThemeProvider.jsx";
@@ -8,7 +8,9 @@ const LandingPage = lazy(() => import("./pages/LandingPage.jsx"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
 const SignInPage = lazy(() => import("./pages/SignInPage.jsx"));
 const SignUpPage = lazy(() => import("./pages/SignUpPage.jsx"));
+const GoogleOAuthCallbackPage = lazy(() => import("./pages/GoogleOAuthCallbackPage.jsx"));
 const ProviderSettingsPage = lazy(() => import("./pages/ProviderSettingsPage.jsx"));
+const GoogleOAuthSettingsPage = lazy(() => import("./pages/GoogleOAuthSettingsPage.jsx"));
 const EnterpriseCloudPage = lazy(() => import("./pages/EnterpriseCloudPage.jsx"));
 const GlobalControlCenterPage = lazy(() => import("./pages/GlobalControlCenterPage.jsx"));
 const AiStudioPage = lazy(() => import("./pages/AiStudioPage.jsx"));
@@ -27,8 +29,10 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/auth/google/callback" element={<GoogleOAuthCallbackPage />} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/settings/providers" element={<ProtectedRoute><ProviderSettingsPage /></ProtectedRoute>} />
+          <Route path="/settings/google-oauth" element={<ProtectedRoute><GoogleOAuthSettingsPage /></ProtectedRoute>} />
           <Route path="/developer" element={<ProtectedRoute><DeveloperOverviewPage /></ProtectedRoute>} />
           <Route path="/developer/api-keys" element={<ProtectedRoute><DeveloperApiKeysPage /></ProtectedRoute>} />
           <Route path="/developer/usage" element={<ProtectedRoute><DeveloperUsagePage /></ProtectedRoute>} />
@@ -37,7 +41,7 @@ export default function App() {
           <Route path="/enterprise-cloud" element={<ProtectedRoute><EnterpriseCloudPage /></ProtectedRoute>} />
           <Route path="/global-control-center" element={<ProtectedRoute><GlobalControlCenterPage /></ProtectedRoute>} />
           <Route path="/ai-studio" element={<ProtectedRoute><AiStudioPage /></ProtectedRoute>} />
-          <Route path="*" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </ThemeProvider>

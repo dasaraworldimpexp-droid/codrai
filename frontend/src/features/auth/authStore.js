@@ -26,10 +26,14 @@ export const useAuthStore = create((set, get) => ({
   user: JSON.parse(localStorage.getItem("codrai_user") || "null"),
   workspaceId: localStorage.getItem("codrai_workspace_id"),
   loading: false,
+  bootstrapped: false,
   error: "",
 
   async bootstrap() {
-    if (!localStorage.getItem("codrai_token")) return null;
+    if (!localStorage.getItem("codrai_token") && !localStorage.getItem("codrai_refresh_token")) {
+      set({ bootstrapped: true });
+      return null;
+    }
     set({ loading: true, error: "" });
     try {
       const result = await authApi.me();
@@ -38,12 +42,25 @@ export const useAuthStore = create((set, get) => ({
         localStorage.setItem("codrai_user", JSON.stringify(user));
         if (user.workspaceId) localStorage.setItem("codrai_workspace_id", user.workspaceId);
       }
-      set({ user, workspaceId: user?.workspaceId || get().workspaceId, token: localStorage.getItem("codrai_token"), loading: false });
+      set({ user, workspaceId: user?.workspaceId || get().workspaceId, token: localStorage.getItem("codrai_token"), loading: false, bootstrapped: true });
       return user;
     } catch (error) {
-      clearSession();
-      set({ token: null, user: null, workspaceId: null, loading: false, error: error.response?.data?.message || error.message });
-      return null;
+      try {
+        const refresh = await authApi.refresh({ refreshToken: localStorage.getItem("codrai_refresh_token") });
+        saveSession(refresh);
+        const restored = await authApi.me();
+        const user = restored.user || refresh.user;
+        if (user) {
+          localStorage.setItem("codrai_user", JSON.stringify(user));
+          if (user.workspaceId) localStorage.setItem("codrai_workspace_id", user.workspaceId);
+        }
+        set({ token: refresh.token, user, workspaceId: user?.workspaceId || refresh.workspaceId || get().workspaceId, loading: false, bootstrapped: true, error: "" });
+        return user;
+      } catch {
+        clearSession();
+        set({ token: null, user: null, workspaceId: null, loading: false, bootstrapped: true, error: error.response?.data?.message || error.message });
+        return null;
+      }
     }
   },
 
@@ -67,6 +84,20 @@ export const useAuthStore = create((set, get) => ({
       const result = await authApi.signup(payload);
       saveSession(result);
       broadcastAuth("signup");
+      set({ token: result.token, user: result.user, workspaceId: result.workspaceId, loading: false });
+      return result;
+    } catch (error) {
+      set({ loading: false, error: error.response?.data?.message || error.message });
+      throw error;
+    }
+  },
+
+  async googleLogin(payload) {
+    set({ loading: true, error: "" });
+    try {
+      const result = await authApi.googleLogin(payload);
+      saveSession(result);
+      broadcastAuth("google_login");
       set({ token: result.token, user: result.user, workspaceId: result.workspaceId, loading: false });
       return result;
     } catch (error) {

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import CodraiBrandMark from "../components/CodraiBrandMark.jsx";
 import { authApi } from "../features/auth/authApi.js";
+import GoogleAuthButton from "../features/auth/components/GoogleAuthButton.jsx";
 import { useAuthStore } from "../features/auth/authStore.js";
 
 export default function SignInPage() {
@@ -32,6 +33,10 @@ export default function SignInPage() {
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     }
+  }
+
+  function handleGoogleSuccess() {
+    navigate(location.state?.from || "/dashboard", { replace: true });
   }
 
   return (
@@ -72,6 +77,23 @@ export default function SignInPage() {
           <button className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-black text-slate-950 disabled:opacity-60" type="submit" disabled={loading}>
             {forgotMode ? "Send recovery" : "Sign in"} <ArrowRight className="h-4 w-4" />
           </button>
+          {!forgotMode && (
+            <>
+              <div className="codrai-auth-divider" role="separator" aria-label="or">
+                <span />
+                <strong>OR</strong>
+                <span />
+              </div>
+              <GoogleAuthButton
+                rememberMe={rememberMe}
+                onSuccess={handleGoogleSuccess}
+                onError={(message) => {
+                  setNotice("");
+                  setError(message);
+                }}
+              />
+            </>
+          )}
           <div className="mt-5 flex justify-between text-sm text-white/55">
             <Link className="font-bold text-white" to="/signup">Create account</Link>
             {forgotMode && <button className="font-bold text-white" type="button" onClick={() => setForgotMode(false)}>Back to sign in</button>}

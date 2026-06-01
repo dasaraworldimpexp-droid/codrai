@@ -9,6 +9,26 @@ export const authApi = {
     return api.post("/auth/login", payload).then((response) => response.data);
   },
 
+  googleConfig() {
+    return api.get("/auth/google/config").then((response) => response.data);
+  },
+
+  googleLogin(payload) {
+    return api.post("/auth/google", payload).then((response) => response.data);
+  },
+
+  googleSettings() {
+    return api.get("/auth/google/settings").then((response) => response.data);
+  },
+
+  saveGoogleSettings(payload) {
+    return api.put("/auth/google/settings", payload).then((response) => response.data);
+  },
+
+  testGoogleSettings() {
+    return api.post("/auth/google/test", {}).then((response) => response.data);
+  },
+
   refresh(payload) {
     return api.post("/auth/refresh", payload).then((response) => response.data);
   },
