@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import CodraiBrandMark from "../components/CodraiBrandMark.jsx";
 import { useAuthStore } from "../features/auth/authStore.js";
+import { detectLocaleProfile, deviceFingerprint, deviceName } from "../features/auth/globalIdentity.js";
 
 function oauthErrorMessage(error, description) {
   if (description) return description;
@@ -29,6 +30,7 @@ export default function GoogleOAuthCallbackPage() {
       const returnTo = sessionStorage.getItem("codrai_google_oauth_return") || "/dashboard";
 
       try {
+        console.log("GOOGLE CALLBACK", { mode: "redirect", hasCode: Boolean(code), hasState: Boolean(state) });
         if (oauthError) throw new Error(oauthErrorMessage(oauthError, oauthDescription));
         if (!code) throw new Error("Google did not return an authorization code.");
         if (!state || !expectedState || state !== expectedState) {
@@ -37,12 +39,26 @@ export default function GoogleOAuthCallbackPage() {
 
         sessionStorage.removeItem("codrai_google_oauth_state");
         sessionStorage.removeItem("codrai_google_oauth_return");
-        await googleLogin({
+        const result = await googleLogin({
           code,
           redirectUri: `${window.location.origin}/auth/google/callback`,
           rememberMe: true,
+          csrfToken: state,
+          deviceFingerprint: await deviceFingerprint(),
+          deviceName: deviceName(),
+          ...detectLocaleProfile(),
         });
-        if (active) navigate(returnTo.startsWith("/") ? returnTo : "/dashboard", { replace: true });
+        if (result.token) {
+          if (active) navigate(returnTo.startsWith("/") ? returnTo : "/dashboard", { replace: true });
+          return;
+        }
+        sessionStorage.setItem("codrai_pending_auth_challenge", JSON.stringify({
+          ...result,
+          csrfToken: state,
+          returnTo: returnTo.startsWith("/") ? returnTo : "/dashboard",
+        }));
+        console.log("GOOGLE MFA REQUIRED", { challengeId: result.challengeId || null });
+        if (active) navigate("/signin?googleVerification=required", { replace: true });
       } catch (err) {
         sessionStorage.removeItem("codrai_google_oauth_state");
         sessionStorage.removeItem("codrai_google_oauth_return");
@@ -66,8 +82,8 @@ export default function GoogleOAuthCallbackPage() {
         {!error ? (
           <>
             <Loader2 className="mx-auto mt-8 h-9 w-9 animate-spin text-codrai-cyan" />
-            <h1 className="mt-5 text-2xl font-black">Completing Google sign-in</h1>
-            <p className="mt-3 text-sm leading-6 text-white/65">CODRAI is validating your Google account and creating a secure session.</p>
+            <h1 className="mt-5 text-2xl font-black">Securing Google sign-in</h1>
+            <p className="mt-3 text-sm leading-6 text-white/65">CODRAI is validating your Google account before identity verification.</p>
           </>
         ) : (
           <>

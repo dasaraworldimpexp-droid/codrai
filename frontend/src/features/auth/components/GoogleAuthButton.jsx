@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { authApi } from "../authApi.js";
 import { useAuthStore } from "../authStore.js";
+import { detectLocaleProfile, deviceFingerprint, deviceName } from "../globalIdentity.js";
 
 const GOOGLE_SCRIPT_ID = "codrai-google-identity-services";
 
@@ -75,10 +76,12 @@ export default function GoogleAuthButton({ onSuccess, onError, rememberMe = true
     setBusy(true);
     try {
       await loadGoogleScript();
-      const csrfState = crypto.randomUUID?.() || String(Date.now());
+      const csrf = await authApi.csrf();
+      const csrfState = csrf.csrfToken || crypto.randomUUID?.() || String(Date.now());
       sessionStorage.setItem("codrai_google_oauth_state", csrfState);
       sessionStorage.setItem("codrai_google_oauth_return", window.location.pathname === "/signin" ? "/dashboard" : window.location.pathname);
       const redirectUri = config.authorizedRedirect || `${window.location.origin}/auth/google/callback`;
+      console.log("GOOGLE CALLBACK", { mode: "popup", redirectUri: "postmessage" });
       codeClientRef.current = window.google.accounts.oauth2.initCodeClient({
         client_id: config.clientId,
         scope: "openid email profile",
@@ -86,6 +89,7 @@ export default function GoogleAuthButton({ onSuccess, onError, rememberMe = true
         state: csrfState,
         callback: async (response) => {
           try {
+            console.log("POSTMESSAGE RECEIVED", { hasCode: Boolean(response.code), error: response.error || null });
             if (response.error) throw new Error(response.error_description || response.error);
             const expectedState = sessionStorage.getItem("codrai_google_oauth_state");
             sessionStorage.removeItem("codrai_google_oauth_state");
@@ -93,9 +97,22 @@ export default function GoogleAuthButton({ onSuccess, onError, rememberMe = true
               throw new Error("Google security state check failed. Please try again.");
             }
             if (!response.code) throw new Error("Google did not return an authorization code.");
-            const result = await googleLogin({ code: response.code, redirectUri: "postmessage", rememberMe });
+            const result = await googleLogin({
+              code: response.code,
+              redirectUri: "postmessage",
+              rememberMe,
+              csrfToken: csrfState,
+              deviceFingerprint: await deviceFingerprint(),
+              deviceName: deviceName(),
+              ...detectLocaleProfile(),
+            });
             sessionStorage.removeItem("codrai_google_oauth_return");
-            onSuccess?.(result);
+            console.log("GOOGLE LOGIN RESULT", { authenticated: Boolean(result.token), challengeId: result.challengeId || null });
+            if (result.token) {
+              window.location.assign("/dashboard");
+              return;
+            }
+            onSuccess?.({ ...result, csrfToken: csrfState });
           } catch (error) {
             onError?.(error.response?.data?.message || error.message || "Google sign-in failed.");
           } finally {
@@ -105,6 +122,7 @@ export default function GoogleAuthButton({ onSuccess, onError, rememberMe = true
         error_callback: (error) => {
           setBusy(false);
           const type = error?.type || "";
+          console.log("POSTMESSAGE RECEIVED", { error: type || error?.message || "google_popup_error" });
           if (type === "popup_closed") {
             sessionStorage.removeItem("codrai_google_oauth_state");
             sessionStorage.removeItem("codrai_google_oauth_return");
@@ -130,6 +148,7 @@ export default function GoogleAuthButton({ onSuccess, onError, rememberMe = true
         redirect_uri: redirectUri,
         state: csrfState,
       });
+      console.log("GOOGLE CALLBACK", { mode: "redirect", redirectUri });
       redirectClient.requestCode();
     } catch (error) {
       setBusy(false);

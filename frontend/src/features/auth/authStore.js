@@ -10,11 +10,19 @@ function saveSession(result) {
 }
 
 function clearSession() {
-  localStorage.removeItem("codrai_token");
-  localStorage.removeItem("codrai_refresh_token");
-  localStorage.removeItem("codrai_workspace_id");
-  localStorage.removeItem("codrai_user_id");
-  localStorage.removeItem("codrai_user");
+  [
+    "codrai_token",
+    "codrai_refresh_token",
+    "codrai_workspace_id",
+    "codrai_user_id",
+    "codrai_user",
+  ].forEach((key) => localStorage.removeItem(key));
+
+  [
+    "codrai_pending_auth_challenge",
+    "codrai_google_oauth_state",
+    "codrai_google_oauth_return",
+  ].forEach((key) => sessionStorage.removeItem(key));
 }
 
 function broadcastAuth(event) {
@@ -68,9 +76,7 @@ export const useAuthStore = create((set, get) => ({
     set({ loading: true, error: "" });
     try {
       const result = await authApi.login(payload);
-      saveSession(result);
-      broadcastAuth("login");
-      set({ token: result.token, user: result.user, workspaceId: result.workspaceId, loading: false });
+      set({ loading: false });
       return result;
     } catch (error) {
       set({ loading: false, error: error.response?.data?.message || error.message });
@@ -82,9 +88,7 @@ export const useAuthStore = create((set, get) => ({
     set({ loading: true, error: "" });
     try {
       const result = await authApi.signup(payload);
-      saveSession(result);
-      broadcastAuth("signup");
-      set({ token: result.token, user: result.user, workspaceId: result.workspaceId, loading: false });
+      set({ loading: false });
       return result;
     } catch (error) {
       set({ loading: false, error: error.response?.data?.message || error.message });
@@ -96,9 +100,45 @@ export const useAuthStore = create((set, get) => ({
     set({ loading: true, error: "" });
     try {
       const result = await authApi.googleLogin(payload);
+      if (result.token) {
+        saveSession(result);
+        broadcastAuth("google_login");
+        set({ token: result.token, user: result.user, workspaceId: result.workspaceId, loading: false });
+      } else {
+        set({ loading: false });
+      }
+      return result;
+    } catch (error) {
+      set({ loading: false, error: error.response?.data?.message || error.message });
+      throw error;
+    }
+  },
+
+  async verifyOtp(payload) {
+    set({ loading: true, error: "" });
+    try {
+      const result = await authApi.verifyOtp(payload);
       saveSession(result);
-      broadcastAuth("google_login");
+      broadcastAuth("otp_login");
       set({ token: result.token, user: result.user, workspaceId: result.workspaceId, loading: false });
+      return result;
+    } catch (error) {
+      set({ loading: false, error: error.response?.data?.message || error.message });
+      throw error;
+    }
+  },
+
+  async verifyPhoneOtp(payload) {
+    set({ loading: true, error: "" });
+    try {
+      const result = await authApi.verifyPhoneOtp(payload);
+      if (result.success && result.verified) {
+        saveSession(result);
+        broadcastAuth("phone_otp_login");
+        set({ token: result.token, user: result.user, workspaceId: result.workspaceId, loading: false });
+      } else {
+        set({ loading: false, error: result.message || "Invalid OTP" });
+      }
       return result;
     } catch (error) {
       set({ loading: false, error: error.response?.data?.message || error.message });
