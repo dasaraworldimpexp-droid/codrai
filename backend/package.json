@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "src/hostinger.cjs",
   "scripts": {
+    "db:audit": "node src/db/audit-auth-schema.js",
     "dev": "nodemon src/server.js",
     "migrate": "node src/db/run-migrations.js",
-    "start": "node src/server.js",
+    "start": "node src/hostinger.cjs",
     "start:workers": "node src/workers/index.js"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.2",
+    "libphonenumber-js": "^1.13.6",
     "mammoth": "^1.12.0",
     "mongoose": "^8.9.2",
     "morgan": "^1.10.0",
@@ -32,8 +35,10 @@
     "pg": "^8.20.0",
     "playwright": "^1.60.0",
     "razorpay": "^2.9.5",
+    "resend": "^6.12.4",
     "socket.io": "^4.8.3",
     "stripe": "^22.1.1",
+    "twilio": "^6.0.2",
     "uuid": "^14.0.0",
     "ws": "^8.20.1",
     "zod": "^3.25.76"

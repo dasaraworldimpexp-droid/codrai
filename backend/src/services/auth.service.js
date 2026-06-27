@@ -67,6 +67,33 @@ function otpMatches(expected, supplied) {
   return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer);
 }
 
+function summarizeOtpDeliveryFailure({ delivery, email, mobile, challengeId }) {
+  const emailAttempts = delivery?.email?.attempts || [];
+  const smsAttempts = delivery?.sms?.attempts || [];
+  const failedAttempts = [...emailAttempts, ...smsAttempts]
+    .filter((attempt) => attempt?.status === "failed" || attempt?.error)
+    .map((attempt) => ({
+      channel: emailAttempts.includes(attempt) ? "email" : "sms",
+      provider: attempt.provider || "unconfigured",
+      error: attempt.error || "Delivery provider did not accept the OTP request.",
+    }));
+  const primary = failedAttempts[0];
+  const rootCause = delivery?.email?.error || primary?.error || "No OTP delivery provider accepted the verification request.";
+  const fix = /not configured|unconfigured|missing/i.test(rootCause)
+    ? "Configure RESEND_API_KEY and RESEND_FROM_EMAIL for email OTP, or enable a working SendGrid fallback."
+    : "Check the email provider dashboard for domain verification, sender reputation, API key validity, rate limits, and rejected recipients.";
+
+  return {
+    code: "OTP_DELIVERY_FAILED",
+    logId: challengeId,
+    rootCause,
+    fix,
+    email: maskEmail(email),
+    mobile: maskMobile(mobile),
+    attempts: failedAttempts,
+  };
+}
+
 export class AuthService {
   constructor({ pool, redis = null }) {
     this.pool = pool;
@@ -529,6 +556,12 @@ export class AuthService {
     }
 
     if (!delivery.delivered) {
+      const diagnostic = summarizeOtpDeliveryFailure({
+        delivery,
+        email: normalizedEmail,
+        mobile: normalizedWhatsapp,
+        challengeId,
+      });
       await this.pool.query(
         "update public.auth_otp_challenges set delivery_status = 'failed' where id = $1",
         [challengeId]
@@ -541,6 +574,8 @@ export class AuthService {
         whatsapp: maskMobile(normalizedWhatsapp),
         emailError: delivery.email?.error || null,
         smsError: delivery.sms?.error || null,
+        logId: diagnostic.logId,
+        rootCause: diagnostic.rootCause,
       });
       return {
         status: "otp_delivery_failed",
@@ -565,7 +600,8 @@ export class AuthService {
             error: delivery.sms?.error || null,
           } : null,
         },
-        message: "Your account credentials were saved, but CODRAI could not deliver the verification code. Check email/SMS provider configuration and resend the OTP.",
+        diagnostic,
+        message: `OTP delivery failed: ${diagnostic.rootCause} Fix: ${diagnostic.fix}`,
       };
     }
 
@@ -807,6 +843,12 @@ export class AuthService {
     }
 
     if (!delivery.delivered) {
+      const diagnostic = summarizeOtpDeliveryFailure({
+        delivery,
+        email: normalizedEmail,
+        mobile: normalizedWhatsapp,
+        challengeId,
+      });
       await this.pool.query(
         "update public.auth_otp_challenges set delivery_status = 'failed' where id = $1",
         [challengeId]
@@ -814,10 +856,12 @@ export class AuthService {
       await this.#audit({
         action: "auth.otp.delivery_failed",
         targetId: challengeId,
-        metadata: { purpose, email: maskEmail(normalizedEmail), mobile: maskMobile(normalizedWhatsapp) },
+        metadata: { purpose, email: maskEmail(normalizedEmail), mobile: maskMobile(normalizedWhatsapp), rootCause: diagnostic.rootCause },
       });
-      throw Object.assign(new Error("We could not deliver the verification code by email. Please retry shortly."), {
+      throw Object.assign(new Error(`OTP delivery failed: ${diagnostic.rootCause} Fix: ${diagnostic.fix}`), {
         statusCode: 502,
+        code: diagnostic.code,
+        diagnostic,
       });
     }
 

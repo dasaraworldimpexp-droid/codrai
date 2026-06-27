@@ -5,6 +5,9 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import agentRuntimeRoutes from "./routes/agent-runtime.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
 import autonomyRoutes from "./routes/autonomy.routes.js";
@@ -21,10 +24,12 @@ import conversationRoutes from "./routes/conversation.routes.js";
 import cosmosIntelligenceRoutes from "./routes/cosmos-intelligence.routes.js";
 import computerUseRoutes from "./routes/computer-use.routes.js";
 import deploymentRoutes from "./routes/deployment.routes.js";
+import debugRoutes from "./routes/debug.routes.js";
 import developerRoutes from "./routes/developer.routes.js";
 import distributedExecutionRoutes from "./routes/distributed-execution.routes.js";
 import distributedRuntimeRoutes from "./routes/distributed-runtime.routes.js";
 import dynamicToolRoutes from "./routes/dynamic-tool.routes.js";
+import emailRoutes from "./routes/email.routes.js";
 import employeeRoutes from "./routes/employee.routes.js";
 import creationRoutes from "./routes/creation.routes.js";
 import enterpriseRoutes from "./routes/enterprise.routes.js";
@@ -65,12 +70,55 @@ import { requestTracing } from "./middleware/request-tracing.middleware.js";
 import { isAllowedClientOrigin } from "./config/cors.js";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-app.use(helmet());
+function detectFrontendDistDir() {
+  const candidates = [
+    path.resolve(process.cwd(), "backend", "dist"),
+    path.resolve(process.cwd(), "dist"),
+    path.resolve(__dirname, "../dist"),
+    path.resolve(__dirname, "../../backend/dist"),
+  ];
+  return candidates.find((candidate) => fs.existsSync(path.join(candidate, "index.html"))) || candidates[0];
+}
+
+const frontendDistDir = detectFrontendDistDir();
+const frontendIndexFile = path.join(frontendDistDir, "index.html");
+const frontendAssetsDir = path.join(frontendDistDir, "assets");
+
+console.log("PWD:", process.cwd());
+console.log("DIRNAME:", __dirname);
+console.log("frontendDistDir:", frontendDistDir);
+console.log("frontendIndexFile:", frontendIndexFile);
+console.log("dist exists:", fs.existsSync(frontendDistDir));
+console.log("index exists:", fs.existsSync(frontendIndexFile));
+console.log("frontendAssetsDir:", frontendAssetsDir);
+console.log("assets exists:", fs.existsSync(frontendAssetsDir));
+
+// Hostinger and most production Node.js hosts terminate TLS/reverse proxy traffic
+// before Express. express-rate-limit validates X-Forwarded-For only when Express
+// explicitly trusts that first proxy hop.
+app.set("trust proxy", 1);
+
+app.use(helmet({
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+}));
+
+app.use("/assets", express.static(frontendAssetsDir, {
+  index: false,
+  fallthrough: true,
+  maxAge: "1y",
+  immutable: true,
+}));
+app.use("/assets", (req, res) => {
+  res.status(404).type("text/plain").send(`CODRAI static asset not found: /assets${req.path}`);
+});
+
 app.use(cors({
   origin(origin, callback) {
     if (isAllowedClientOrigin(origin)) return callback(null, true);
-    return callback(new Error(`CORS origin not allowed: ${origin}`));
+    return callback(Object.assign(new Error(`CORS origin not allowed: ${origin}`), { statusCode: 403 }));
   },
   credentials: true,
 }));
@@ -92,10 +140,36 @@ app.use(morgan("dev"));
 app.use(optionalAuth);
 app.use(requestTracing());
 
+app.get("/status", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    app: "CODRAI",
+    runtime: app.locals.runtimeBootstrapStatus || { status: "starting" },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
+    database: Boolean(app.locals.pool),
+    server: "running",
     app: "CODRAI API",
+    runtime: app.locals.runtimeBootstrapStatus || { status: "starting" },
+    websocket: app.locals.websocketStatus || { status: app.locals.websocketServer ? "ready" : "starting" },
+    socketio: app.locals.socketIoStatus || { status: app.locals.socketIoServer ? "ready" : "starting" },
+    startup: globalThis.__CODRAI_STARTUP_DIAGNOSTICS__ || null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/api/startup", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    startup: globalThis.__CODRAI_STARTUP_DIAGNOSTICS__ || null,
+    runtime: app.locals.runtimeBootstrapStatus || { status: "starting" },
+    websocket: app.locals.websocketStatus || { status: app.locals.websocketServer ? "ready" : "starting" },
+    socketio: app.locals.socketIoStatus || { status: app.locals.socketIoServer ? "ready" : "starting" },
     timestamp: new Date().toISOString(),
   });
 });
@@ -103,6 +177,11 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/runtime", runtimeRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/auth", authRoutes);
+console.log("Auth route loaded", { mounts: ["/api/auth", "/auth"] });
+console.log("Forgot password endpoint registered", {
+  endpoints: ["POST /api/auth/forgot-password", "POST /auth/forgot-password"],
+});
 app.use("/api/ai-studio", aiStudioRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/billing", billingRoutes);
@@ -112,10 +191,12 @@ app.use("/api/civilization-network", civilizationNetworkRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/cosmos-intelligence", cosmosIntelligenceRoutes);
 app.use("/api/deployment", deploymentRoutes);
+app.use("/api/debug", debugRoutes);
 app.use("/api/developer", developerRoutes);
 app.use("/api/distributed-execution", distributedExecutionRoutes);
 app.use("/api/distributed-runtime", distributedRuntimeRoutes);
 app.use("/api/dynamic-tools", dynamicToolRoutes);
+app.use("/api", emailRoutes);
 app.use("/api/workflows", workflowRoutes);
 app.use("/api/self-improvement", selfImprovementRoutes);
 app.use("/api/self-healing", selfHealingRoutes);
@@ -156,6 +237,51 @@ app.use("/api/infrastructure", infrastructureRoutes);
 app.use("/api/internet-execution", internetExecutionRoutes);
 app.use("/api/telemetry", telemetryRoutes);
 
+app.use("/api", (_req, res) => {
+  res.status(404).json({
+    message: "CODRAI API route not found.",
+    status: "failed",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.use(express.static(frontendDistDir, {
+  index: false,
+  maxAge: "1y",
+  immutable: true,
+  setHeaders(res, filePath) {
+    if (filePath === frontendIndexFile || filePath.endsWith(".webmanifest") || filePath.endsWith("sw.js")) {
+      res.setHeader("Cache-Control", "no-store");
+    }
+  },
+}));
+
+app.get("*", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!fs.existsSync(frontendIndexFile)) {
+    return res.status(503).json({
+      status: "error",
+      message: "CODRAI frontend build path could not be resolved.",
+      cwd: process.cwd(),
+      dirname: __dirname,
+      frontendDistDir,
+      frontendIndexFile,
+      distExists: fs.existsSync(frontendDistDir),
+      indexExists: fs.existsSync(frontendIndexFile),
+    });
+  }
+  res.sendFile(frontendIndexFile, (err) => {
+    if (!err) return;
+    next(Object.assign(new Error(`CODRAI frontend sendFile failed for ${frontendIndexFile}: ${err.message}`), {
+      statusCode: 503,
+      frontendDistDir,
+      frontendIndexFile,
+      distExists: fs.existsSync(frontendDistDir),
+      indexExists: fs.existsSync(frontendIndexFile),
+    }));
+  });
+});
+
 function runtimeErrorMessage(err) {
   if (err?.message) return err.message;
   if (Array.isArray(err?.errors) && err.errors.length) {
@@ -166,11 +292,14 @@ function runtimeErrorMessage(err) {
 
 app.use((err, _req, res, _next) => {
   const statusCode = Number(err.statusCode || err.status || 500);
-  res.status(statusCode).json({
+  const payload = {
     message: runtimeErrorMessage(err),
     status: statusCode >= 500 ? "error" : "failed",
     timestamp: new Date().toISOString(),
-  });
+  };
+  if (err.code) payload.code = err.code;
+  if (err.diagnostic) payload.diagnostic = err.diagnostic;
+  res.status(statusCode).json(payload);
 });
 
 export default app;
